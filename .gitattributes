@@ -3,6 +3,7 @@
 ###############################################################################
 * text=auto
 Cargo.lock eol=lf
+src-tauri/Cargo.toml eol=lf
 
 ###############################################################################
 # Set default behavior for command prompt diff.
