@@ -2,7 +2,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use serde_json::Value;
 use std::env;
-#[cfg(target_os = "windows")]
 use std::fs::{self, File};
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
