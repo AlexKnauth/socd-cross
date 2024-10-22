@@ -1,5 +1,6 @@
 use once_cell::sync::Lazy;
 use rdev::{listen, simulate, Event, EventType, Key};
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::cmp;
 use std::collections::HashMap;
@@ -21,22 +22,23 @@ struct ConfigJsonData {
 struct KeyState {
     is_pressed: bool,
     result_type: String,
-    result_value: String,
+    result_value: Key,
 }
 
 #[derive(Clone)]
 struct OppositeKey {
     is_pressed: bool,
     is_virtual_pressed: bool,
+    is_virtual_fresh: bool,
     opposite_key_type: String,
-    opposite_key_value: String,
-    opposite_key_mapping: Option<String>,
+    opposite_key_value: Key,
+    opposite_key_mapping: Option<Key>,
 }
 
-static KEY_STATES: Lazy<Arc<RwLock<HashMap<String, KeyState>>>> =
+static KEY_STATES: Lazy<Arc<RwLock<HashMap<Key, KeyState>>>> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
-static OPPOSITE_KEY_STATES: Lazy<Arc<RwLock<HashMap<String, OppositeKey>>>> =
+static OPPOSITE_KEY_STATES: Lazy<Arc<RwLock<HashMap<Key, OppositeKey>>>> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 struct SharedState {
@@ -79,183 +81,6 @@ impl KeyInterceptor {
 
     pub fn initialize(&mut self, settings: &Settings) -> Result<(), String> {
         std::thread::spawn(|| {
-            let state = RwLock::new(OpposedKeysState {
-                left: OpposedKeyState::Released,
-                right: OpposedKeyState::Released,
-                up: OpposedKeyState::Released,
-                down: OpposedKeyState::Released,
-            });
-            let listen_callback = move |event: Event| {
-                match event.event_type {
-                    EventType::KeyPress(key) => {
-                        // println!("{:?}", event.event_type);
-                        let mut s = state.write().unwrap();
-                        match key {
-                            Key::KeyA => {
-                                let prev = replace(&mut s.left, OpposedKeyState::Pressed);
-                                if let OpposedKeyState::Pressed = prev {
-                                    return;
-                                }
-                                match s.right {
-                                    OpposedKeyState::Pressed => {
-                                        println!("user press: A, simulate release: E");
-                                        s.right = OpposedKeyState::OpposedFresh;
-                                        drop(s);
-                                        simulate(&EventType::KeyRelease(Key::KeyE)).ok();
-                                    }
-                                    OpposedKeyState::Released => {
-                                        if let OpposedKeyState::Released = prev {
-                                            println!("user press: A, fresh");
-                                        }
-                                    }
-                                    _ => (),
-                                }
-                            }
-                            Key::KeyE => {
-                                let prev = replace(&mut s.right, OpposedKeyState::Pressed);
-                                if let OpposedKeyState::Pressed = prev {
-                                    return;
-                                }
-                                match s.left {
-                                    OpposedKeyState::Pressed => {
-                                        println!("user press: E, simulate release: A");
-                                        s.left = OpposedKeyState::OpposedFresh;
-                                        drop(s);
-                                        simulate(&EventType::KeyRelease(Key::KeyA)).ok();
-                                    }
-                                    OpposedKeyState::Released => {
-                                        if let OpposedKeyState::Released = prev {
-                                            println!("user press E, fresh");
-                                        }
-                                    }
-                                    _ => (),
-                                }
-                            }
-                            Key::Comma => {
-                                let prev = replace(&mut s.up, OpposedKeyState::Pressed);
-                                if let OpposedKeyState::Pressed = prev {
-                                    return;
-                                }
-                                match s.down {
-                                    OpposedKeyState::Pressed => {
-                                        println!("user press: Comma, simulate release: O");
-                                        s.down = OpposedKeyState::OpposedFresh;
-                                        drop(s);
-                                        simulate(&EventType::KeyRelease(Key::KeyO)).ok();
-                                    }
-                                    OpposedKeyState::Released => {
-                                        if let OpposedKeyState::Released = prev {
-                                            println!("user press Comma, fresh");
-                                        }
-                                    }
-                                    _ => (),
-                                }
-                            }
-                            Key::KeyO => {
-                                let prev = replace(&mut s.down, OpposedKeyState::Pressed);
-                                if let OpposedKeyState::Pressed = prev {
-                                    return;
-                                }
-                                match s.up {
-                                    OpposedKeyState::Pressed => {
-                                        println!("user press: O, simulate release: E");
-                                        s.up = OpposedKeyState::OpposedFresh;
-                                        drop(s);
-                                        simulate(&EventType::KeyRelease(Key::Comma)).ok();
-                                    }
-                                    OpposedKeyState::Released => {
-                                        if let OpposedKeyState::Released = prev {
-                                            println!("user press O, fresh");
-                                        }
-                                    }
-                                    _ => (),
-                                }
-                            }
-                            _ => (),
-                        }
-                    }
-                    EventType::KeyRelease(key) => {
-                        // println!("{:?}", event.event_type);
-                        let mut s = state.write().unwrap();
-                        match key {
-                            Key::KeyA => {
-                                match s.left {
-                                    OpposedKeyState::Released => (),
-                                    OpposedKeyState::OpposedSeen => s.left = OpposedKeyState::Released,
-                                    OpposedKeyState::OpposedFresh => s.left = OpposedKeyState::OpposedSeen,
-                                    OpposedKeyState::Pressed => s.left = OpposedKeyState::Released,
-                                }
-                                match s.right {
-                                    OpposedKeyState::Released => (),
-                                    OpposedKeyState::Pressed => (),
-                                    _ => {
-                                        println!("user release: A, simulate press: E");
-                                        s.right = OpposedKeyState::Pressed;
-                                        drop(s);
-                                        simulate(&EventType::KeyPress(Key::KeyE)).ok();
-                                    }
-                                }
-                            }
-                            Key::KeyE => {
-                                match s.right {
-                                    OpposedKeyState::Released => (),
-                                    OpposedKeyState::OpposedSeen => s.right = OpposedKeyState::Released,
-                                    OpposedKeyState::OpposedFresh => s.right = OpposedKeyState::OpposedSeen,
-                                    OpposedKeyState::Pressed => s.right = OpposedKeyState::Released,
-                                }
-                                match s.left {
-                                    OpposedKeyState::Released => (),
-                                    OpposedKeyState::Pressed => (),
-                                    _ => {
-                                        println!("user release: E, simulate press: A");
-                                        s.left = OpposedKeyState::Pressed;
-                                        drop(s);
-                                        simulate(&EventType::KeyPress(Key::KeyA)).ok();
-                                    }
-                                }
-                            }
-                            Key::Comma => {
-                                match s.up {
-                                    OpposedKeyState::Released => (),
-                                    OpposedKeyState::OpposedSeen => s.up = OpposedKeyState::Released,
-                                    OpposedKeyState::OpposedFresh => s.up = OpposedKeyState::OpposedSeen,
-                                    OpposedKeyState::Pressed => s.up = OpposedKeyState::Released,
-                                }
-                                match s.down {
-                                    OpposedKeyState::Released => (),
-                                    OpposedKeyState::Pressed => (),
-                                    _ => {
-                                        println!("user release: Comma, simulate press: O");
-                                        s.down = OpposedKeyState::Pressed;
-                                        drop(s);
-                                        simulate(&EventType::KeyPress(Key::KeyO)).ok();
-                                    }
-                                }
-                            }
-                            Key::KeyO => {
-                                match s.down {
-                                    OpposedKeyState::Released => (),
-                                    OpposedKeyState::OpposedSeen => s.down = OpposedKeyState::Released,
-                                    OpposedKeyState::OpposedFresh => s.down = OpposedKeyState::OpposedSeen,
-                                    OpposedKeyState::Pressed => s.down = OpposedKeyState::Released,
-                                }
-                                match s.up {
-                                    OpposedKeyState::Released => (),
-                                    OpposedKeyState::Pressed => (),
-                                    _ => {
-                                        println!("user release: O, simulate press: Comma");
-                                        s.up = OpposedKeyState::Pressed;
-                                        drop(s);
-                                        simulate(&EventType::KeyPress(Key::Comma)).ok();
-                                    }
-                                }
-                            }
-                            _ => (),
-                        }
-                    }
-                    _ => (),
-                }
-            };
             // This will block.
             if let Err(error) = listen(listen_callback) {
                 println!("Error: {:?}", error)
@@ -285,13 +110,13 @@ impl KeyInterceptor {
         let mut opposite_key_states = HashMap::new();
 
         for item in &data {
-            let keycode = item.keycode.clone();
+            let keycode: Key = serde_from_json_str(&item.keycode).expect("Invalid key string");
 
             if item.result_type != "socd" {
-                let key_state = key_states.entry(keycode.clone()).or_insert_with(|| KeyState {
+                let key_state = key_states.entry(keycode).or_insert_with(|| KeyState {
                     is_pressed: false,
                     result_type: item.result_type.clone(),
-                    result_value: item.result_value.clone(),
+                    result_value: serde_from_json_str(&item.result_value).expect("Invalid key string"),
                 });
                 println!(
                     "Keycode: {:?}, ResultType: {:?}, ResultValue {:?}",
@@ -301,10 +126,10 @@ impl KeyInterceptor {
         }
 
         for item in &data {
-            let keycode = item.keycode.clone();
+            let keycode: Key = serde_from_json_str(&item.keycode).unwrap();
 
             if item.result_type == "socd" {
-                let opposite_keycode = item.result_value.clone();
+                let opposite_keycode: Key = serde_from_json_str(&item.result_value).expect("Invalid key string");
 
                 // Check if key_state has a value for the opposite keycode and if so then use that value instead
                 let key_state = key_states.get(&keycode);
@@ -324,6 +149,7 @@ impl KeyInterceptor {
                     .or_insert_with(|| OppositeKey {
                         is_pressed: false,
                         is_virtual_pressed: false,
+                        is_virtual_fresh: false,
                         opposite_key_value: opposite_keycode,
                         opposite_key_type: key_type,
                         opposite_key_mapping: key_mapping,
@@ -412,4 +238,94 @@ fn find_higher_priority(num1: i16, num2: i16) -> i16 {
     } else {
         return num2;
     }
+}
+
+fn listen_callback(event: Event) {
+    let (key, key_is_down) = match event.event_type {
+        EventType::KeyPress(key) => (key, true),
+        EventType::KeyRelease(key) => (key, false),
+        _ => return,
+    };
+    
+    // Update Key State
+    {
+        let mut key_states = KEY_STATES.write().unwrap();
+        match key_states.get_mut(&key) {
+            Some(state) => state.is_pressed = key_is_down,
+            _ => (),
+        }
+    }
+
+    // Keyboard Rebinds
+    {
+        let key_states = KEY_STATES.read().unwrap();
+        if let Some(key_state) = key_states.get(&key) {
+            if key_state.result_type == "keyboard" {
+                let result_value = key_state.result_value;
+                drop(key_states);
+                if key_is_down {
+                    simulate(&EventType::KeyPress(result_value)).ok();
+                } else {
+                    simulate(&EventType::KeyRelease(result_value)).ok();
+                }
+                return;
+            }
+        }
+    }
+
+    // SOCD
+    {
+        let mut opposite_key_states = OPPOSITE_KEY_STATES.write().unwrap();
+
+        let cloned_key_state;
+        if opposite_key_states.contains_key(&key) {
+            {
+                let key_state = opposite_key_states.get_mut(&key).unwrap();
+                if key_state.is_virtual_fresh && key_is_down == key_state.is_virtual_pressed {
+                    key_state.is_virtual_fresh = false;
+                    return;
+                }
+                if key_is_down != key_state.is_virtual_pressed {
+                    println!("{:?} {}", key, key_is_down);
+                }
+                key_state.is_pressed = key_is_down;
+                key_state.is_virtual_pressed = key_is_down;
+
+                cloned_key_state = key_state.clone();
+            }
+
+            let opposite_key_state = opposite_key_states
+                .get_mut(&cloned_key_state.opposite_key_value)
+                .unwrap();
+
+            if key_is_down && opposite_key_state.is_pressed && opposite_key_state.is_virtual_pressed
+            {
+                opposite_key_state.is_virtual_pressed = false;
+                opposite_key_state.is_virtual_fresh = true;
+
+                {
+                    let opposite_key_value = cloned_key_state.opposite_key_value;
+                    drop(opposite_key_states);
+                    println!(" -> {:?} false", opposite_key_value);
+                    simulate(&EventType::KeyRelease(opposite_key_value)).ok();
+                    return;
+                }
+            } else if !key_is_down && opposite_key_state.is_pressed {
+                opposite_key_state.is_virtual_pressed = true;
+                opposite_key_state.is_virtual_fresh = true;
+
+                {
+                    let opposite_key_value = cloned_key_state.opposite_key_value;
+                    drop(opposite_key_states);
+                    println!(" -> {:?} true", opposite_key_value);
+                    simulate(&EventType::KeyPress(opposite_key_value)).ok();
+                    return;
+                }
+            }
+        }
+    }
+}
+
+fn serde_from_json_str<T: DeserializeOwned>(s: &str) -> serde_json::Result<T> {
+    serde_json::from_value(serde_json::Value::String(s.to_string()))
 }
