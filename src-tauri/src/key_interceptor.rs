@@ -1,9 +1,11 @@
 use once_cell::sync::Lazy;
+use rdev::{listen, simulate, Event, EventType, Key};
 use serde::Deserialize;
 use std::cmp;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
+use std::mem::replace;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -53,6 +55,21 @@ pub(crate) struct KeyInterceptor {
     pub should_run: Arc<AtomicBool>,
 }
 
+struct OpposedKeysState {
+    left: OpposedKeyState,
+    right: OpposedKeyState,
+    up: OpposedKeyState,
+    down: OpposedKeyState,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum OpposedKeyState {
+    Released,
+    OpposedSeen,
+    OpposedFresh,
+    Pressed,
+}
+
 impl KeyInterceptor {
     pub fn new() -> Self {
         Self {
@@ -61,6 +78,190 @@ impl KeyInterceptor {
     }
 
     pub fn initialize(&mut self, settings: &Settings) -> Result<(), String> {
+        std::thread::spawn(|| {
+            let state = RwLock::new(OpposedKeysState {
+                left: OpposedKeyState::Released,
+                right: OpposedKeyState::Released,
+                up: OpposedKeyState::Released,
+                down: OpposedKeyState::Released,
+            });
+            let listen_callback = move |event: Event| {
+                match event.event_type {
+                    EventType::KeyPress(key) => {
+                        // println!("{:?}", event.event_type);
+                        let mut s = state.write().unwrap();
+                        match key {
+                            Key::KeyA => {
+                                let prev = replace(&mut s.left, OpposedKeyState::Pressed);
+                                if let OpposedKeyState::Pressed = prev {
+                                    return;
+                                }
+                                match s.right {
+                                    OpposedKeyState::Pressed => {
+                                        println!("user press: A, simulate release: E");
+                                        s.right = OpposedKeyState::OpposedFresh;
+                                        drop(s);
+                                        simulate(&EventType::KeyRelease(Key::KeyE)).ok();
+                                    }
+                                    OpposedKeyState::Released => {
+                                        if let OpposedKeyState::Released = prev {
+                                            println!("user press: A, fresh");
+                                        }
+                                    }
+                                    _ => (),
+                                }
+                            }
+                            Key::KeyE => {
+                                let prev = replace(&mut s.right, OpposedKeyState::Pressed);
+                                if let OpposedKeyState::Pressed = prev {
+                                    return;
+                                }
+                                match s.left {
+                                    OpposedKeyState::Pressed => {
+                                        println!("user press: E, simulate release: A");
+                                        s.left = OpposedKeyState::OpposedFresh;
+                                        drop(s);
+                                        simulate(&EventType::KeyRelease(Key::KeyA)).ok();
+                                    }
+                                    OpposedKeyState::Released => {
+                                        if let OpposedKeyState::Released = prev {
+                                            println!("user press E, fresh");
+                                        }
+                                    }
+                                    _ => (),
+                                }
+                            }
+                            Key::Comma => {
+                                let prev = replace(&mut s.up, OpposedKeyState::Pressed);
+                                if let OpposedKeyState::Pressed = prev {
+                                    return;
+                                }
+                                match s.down {
+                                    OpposedKeyState::Pressed => {
+                                        println!("user press: Comma, simulate release: O");
+                                        s.down = OpposedKeyState::OpposedFresh;
+                                        drop(s);
+                                        simulate(&EventType::KeyRelease(Key::KeyO)).ok();
+                                    }
+                                    OpposedKeyState::Released => {
+                                        if let OpposedKeyState::Released = prev {
+                                            println!("user press Comma, fresh");
+                                        }
+                                    }
+                                    _ => (),
+                                }
+                            }
+                            Key::KeyO => {
+                                let prev = replace(&mut s.down, OpposedKeyState::Pressed);
+                                if let OpposedKeyState::Pressed = prev {
+                                    return;
+                                }
+                                match s.up {
+                                    OpposedKeyState::Pressed => {
+                                        println!("user press: O, simulate release: E");
+                                        s.up = OpposedKeyState::OpposedFresh;
+                                        drop(s);
+                                        simulate(&EventType::KeyRelease(Key::Comma)).ok();
+                                    }
+                                    OpposedKeyState::Released => {
+                                        if let OpposedKeyState::Released = prev {
+                                            println!("user press O, fresh");
+                                        }
+                                    }
+                                    _ => (),
+                                }
+                            }
+                            _ => (),
+                        }
+                    }
+                    EventType::KeyRelease(key) => {
+                        // println!("{:?}", event.event_type);
+                        let mut s = state.write().unwrap();
+                        match key {
+                            Key::KeyA => {
+                                match s.left {
+                                    OpposedKeyState::Released => (),
+                                    OpposedKeyState::OpposedSeen => s.left = OpposedKeyState::Released,
+                                    OpposedKeyState::OpposedFresh => s.left = OpposedKeyState::OpposedSeen,
+                                    OpposedKeyState::Pressed => s.left = OpposedKeyState::Released,
+                                }
+                                match s.right {
+                                    OpposedKeyState::Released => (),
+                                    OpposedKeyState::Pressed => (),
+                                    _ => {
+                                        println!("user release: A, simulate press: E");
+                                        s.right = OpposedKeyState::Pressed;
+                                        drop(s);
+                                        simulate(&EventType::KeyPress(Key::KeyE)).ok();
+                                    }
+                                }
+                            }
+                            Key::KeyE => {
+                                match s.right {
+                                    OpposedKeyState::Released => (),
+                                    OpposedKeyState::OpposedSeen => s.right = OpposedKeyState::Released,
+                                    OpposedKeyState::OpposedFresh => s.right = OpposedKeyState::OpposedSeen,
+                                    OpposedKeyState::Pressed => s.right = OpposedKeyState::Released,
+                                }
+                                match s.left {
+                                    OpposedKeyState::Released => (),
+                                    OpposedKeyState::Pressed => (),
+                                    _ => {
+                                        println!("user release: E, simulate press: A");
+                                        s.left = OpposedKeyState::Pressed;
+                                        drop(s);
+                                        simulate(&EventType::KeyPress(Key::KeyA)).ok();
+                                    }
+                                }
+                            }
+                            Key::Comma => {
+                                match s.up {
+                                    OpposedKeyState::Released => (),
+                                    OpposedKeyState::OpposedSeen => s.up = OpposedKeyState::Released,
+                                    OpposedKeyState::OpposedFresh => s.up = OpposedKeyState::OpposedSeen,
+                                    OpposedKeyState::Pressed => s.up = OpposedKeyState::Released,
+                                }
+                                match s.down {
+                                    OpposedKeyState::Released => (),
+                                    OpposedKeyState::Pressed => (),
+                                    _ => {
+                                        println!("user release: Comma, simulate press: O");
+                                        s.down = OpposedKeyState::Pressed;
+                                        drop(s);
+                                        simulate(&EventType::KeyPress(Key::KeyO)).ok();
+                                    }
+                                }
+                            }
+                            Key::KeyO => {
+                                match s.down {
+                                    OpposedKeyState::Released => (),
+                                    OpposedKeyState::OpposedSeen => s.down = OpposedKeyState::Released,
+                                    OpposedKeyState::OpposedFresh => s.down = OpposedKeyState::OpposedSeen,
+                                    OpposedKeyState::Pressed => s.down = OpposedKeyState::Released,
+                                }
+                                match s.up {
+                                    OpposedKeyState::Released => (),
+                                    OpposedKeyState::Pressed => (),
+                                    _ => {
+                                        println!("user release: O, simulate press: Comma");
+                                        s.up = OpposedKeyState::Pressed;
+                                        drop(s);
+                                        simulate(&EventType::KeyPress(Key::Comma)).ok();
+                                    }
+                                }
+                            }
+                            _ => (),
+                        }
+                    }
+                    _ => (),
+                }
+            };
+            // This will block.
+            if let Err(error) = listen(listen_callback) {
+                println!("Error: {:?}", error)
+            }
+        });
+
         let mut shared_state = SHARED_STATE.write().unwrap();
         if !settings.allowed_programs.is_empty() {
             println!("Allowed programs: {:?}", settings.allowed_programs);
