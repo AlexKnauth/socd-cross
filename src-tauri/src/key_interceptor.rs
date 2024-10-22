@@ -2,11 +2,9 @@ use once_cell::sync::Lazy;
 use rdev::{listen, simulate, Event, EventType, Key};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
-use std::cmp;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
-use std::mem::replace;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -55,21 +53,6 @@ static SHARED_STATE: Lazy<Arc<RwLock<SharedState>>> = Lazy::new(|| {
 
 pub(crate) struct KeyInterceptor {
     pub should_run: Arc<AtomicBool>,
-}
-
-struct OpposedKeysState {
-    left: OpposedKeyState,
-    right: OpposedKeyState,
-    up: OpposedKeyState,
-    down: OpposedKeyState,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum OpposedKeyState {
-    Released,
-    OpposedSeen,
-    OpposedFresh,
-    Pressed,
 }
 
 impl KeyInterceptor {
@@ -189,54 +172,6 @@ impl KeyInterceptor {
     pub fn is_running(&self) -> bool {
         let shared_state = SHARED_STATE.read().unwrap();
         shared_state.is_running
-    }
-}
-
-fn is_extended_key(virtual_keycode: Key) -> bool {
-    let extended_keys: [Key; 14] = [
-        Key::PageUp, //page up
-        Key::PageDown, //page down
-        Key::End, //end
-        Key::Home, //home
-        Key::LeftArrow, //left arrow
-        Key::UpArrow, //up arrow
-        Key::RightArrow, //right arrow
-        Key::DownArrow, //down arrow
-        Key::PrintScreen, //print screen
-        Key::Insert, //insert
-        Key::Delete, //delete
-        Key::NumLock, //numlock
-        Key::ControlRight, //right CTRL
-        Key::Alt, //ALT
-    ];
-    extended_keys.contains(&virtual_keycode)
-}
-
-// Used for when multiple stick rebinds are set, first prioritizes right/up(positive) over left/down(negative), then larger values within those bands
-// neutral(zero) is the absolute lowest priority
-fn analog_priority_transform(n: i32) -> i32 {
-    if n < 0 {
-        return -1 * n;
-    }
-    if n > 0 {
-        return n + i16::MAX as i32;
-    }
-
-    0
-}
-
-fn find_higher_priority(num1: i16, num2: i16) -> i16 {
-    if num1 == 0 {
-        return num2;
-    }
-    if num2 == 0 {
-        return num1;
-    }
-
-    if analog_priority_transform(num1 as i32) >= analog_priority_transform(num2 as i32) {
-        return num1;
-    } else {
-        return num2;
     }
 }
 
