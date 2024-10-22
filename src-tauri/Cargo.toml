@@ -17,7 +17,7 @@ tauri = { version = "1.5", features = [ "fs-all", "system-tray", "shell-open"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 once_cell = "1.19.0"
-rdev = { git = "https://github.com/AlexKnauth/rdev", branch = "serialize", features = ["serialize"] }
+rdev = { version = "0.5.3", features = ["serialize"] }
 tauri-plugin-window-state = "0.1.0"
 
 [features]
