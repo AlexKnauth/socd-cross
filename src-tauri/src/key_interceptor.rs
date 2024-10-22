@@ -15,13 +15,13 @@ use crate::{get_config_path, Settings};
 struct ConfigJsonData {
     keycode: String,
     result_type: String,
-    result_value: i32,
+    result_value: String,
 }
 
 struct KeyState {
     is_pressed: bool,
     result_type: String,
-    result_value: i32,
+    result_value: String,
 }
 
 #[derive(Clone)]
@@ -29,14 +29,14 @@ struct OppositeKey {
     is_pressed: bool,
     is_virtual_pressed: bool,
     opposite_key_type: String,
-    opposite_key_value: u32,
-    opposite_key_mapping: Option<u16>,
+    opposite_key_value: String,
+    opposite_key_mapping: Option<String>,
 }
 
-static KEY_STATES: Lazy<Arc<RwLock<HashMap<u32, KeyState>>>> =
+static KEY_STATES: Lazy<Arc<RwLock<HashMap<String, KeyState>>>> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
-static OPPOSITE_KEY_STATES: Lazy<Arc<RwLock<HashMap<u32, OppositeKey>>>> =
+static OPPOSITE_KEY_STATES: Lazy<Arc<RwLock<HashMap<String, OppositeKey>>>> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 struct SharedState {
@@ -285,14 +285,13 @@ impl KeyInterceptor {
         let mut opposite_key_states = HashMap::new();
 
         for item in &data {
-            let keycode =
-                u32::from_str_radix(&item.keycode, 16).expect("Invalid hexadecimal string");
+            let keycode = item.keycode.clone();
 
             if item.result_type != "socd" {
-                let key_state = key_states.entry(keycode).or_insert_with(|| KeyState {
+                let key_state = key_states.entry(keycode.clone()).or_insert_with(|| KeyState {
                     is_pressed: false,
                     result_type: item.result_type.clone(),
-                    result_value: item.result_value,
+                    result_value: item.result_value.clone(),
                 });
                 println!(
                     "Keycode: {:?}, ResultType: {:?}, ResultValue {:?}",
@@ -302,13 +301,13 @@ impl KeyInterceptor {
         }
 
         for item in &data {
-            let keycode = u32::from_str_radix(&item.keycode, 16);
+            let keycode = item.keycode.clone();
 
             if item.result_type == "socd" {
-                let opposite_keycode = item.result_value as u32;
+                let opposite_keycode = item.result_value.clone();
 
                 // Check if key_state has a value for the opposite keycode and if so then use that value instead
-                let key_state = key_states.get(&keycode.clone().unwrap());
+                let key_state = key_states.get(&keycode);
                 let mut key_type = String::from("keyboard");
                 let mut key_mapping = None;
 
@@ -317,11 +316,11 @@ impl KeyInterceptor {
                         || key_state.unwrap().result_type == "face_button")
                 {
                     key_type = key_state.unwrap().result_type.clone();
-                    key_mapping = Some(key_state.unwrap().result_value as u16);
+                    key_mapping = Some(key_state.unwrap().result_value.clone());
                 }
 
                 let opposite_key_state = opposite_key_states
-                    .entry(keycode.clone().unwrap())
+                    .entry(keycode.clone())
                     .or_insert_with(|| OppositeKey {
                         is_pressed: false,
                         is_virtual_pressed: false,
@@ -367,22 +366,22 @@ impl KeyInterceptor {
     }
 }
 
-fn is_extended_key(virtual_keycode: u32) -> bool {
-    let extended_keys: [u32; 14] = [
-        0x21, //page up
-        0x22, //page down
-        0x23, //end
-        0x24, //home
-        0x25, //left arrow
-        0x26, //up arrow
-        0x27, //right arrow
-        0x28, //down arrow
-        0x2C, //print screen
-        0x2D, //insert
-        0x2E, //delete
-        0x90, //numlock
-        0xA3, //right CTRL
-        0xA5, //right ALT
+fn is_extended_key(virtual_keycode: Key) -> bool {
+    let extended_keys: [Key; 14] = [
+        Key::PageUp, //page up
+        Key::PageDown, //page down
+        Key::End, //end
+        Key::Home, //home
+        Key::LeftArrow, //left arrow
+        Key::UpArrow, //up arrow
+        Key::RightArrow, //right arrow
+        Key::DownArrow, //down arrow
+        Key::PrintScreen, //print screen
+        Key::Insert, //insert
+        Key::Delete, //delete
+        Key::NumLock, //numlock
+        Key::ControlRight, //right CTRL
+        Key::Alt, //ALT
     ];
     extended_keys.contains(&virtual_keycode)
 }

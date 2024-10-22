@@ -18,7 +18,7 @@ use tauri::{Manager, State};
 struct KeyConfig {
     keycode: String,
     result_type: String,
-    result_value: i32,
+    result_value: String,
 }
 
 #[derive(Clone)]

@@ -1,42 +1,22 @@
 [
     {
-        "keycode": "51",
-        "result_type": "thumb_lx",
-        "result_value": -29000
-    },
-    {
-        "keycode": "45",
-        "result_type": "thumb_lx",
-        "result_value": 29000
-    },
-    {
-        "keycode": "58",
-        "result_type": "thumb_ry",
-        "result_value": 29000
-    },
-    {
-        "keycode": "27",
+        "keycode": "RightArrow",
         "result_type": "socd",
-        "result_value": 37
+        "result_value": "LeftArrow"
     },
     {
-        "keycode": "25",
+        "keycode": "LeftArrow",
         "result_type": "socd",
-        "result_value": 39
+        "result_value": "RightArrow"
     },
     {
-        "keycode": "28",
+        "keycode": "DownArrow",
         "result_type": "socd",
-        "result_value": 38
+        "result_value": "UpArrow"
     },
     {
-        "keycode": "26",
+        "keycode": "UpArrow",
         "result_type": "socd",
-        "result_value": 40
-    },
-    {
-        "keycode": "46",
-        "result_type": "keyboard",
-        "result_value": 27
+        "result_value": "DownArrow"
     }
 ]

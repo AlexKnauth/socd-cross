@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api";
 import { useEffect, useState } from "react";
-import { WINDOWS_ECMA_KEYMAP, CONTROLLER_INPUTS } from "../constants";
+import { WEB_TO_RDEV_KEYMAP } from "../constants";
 import Dropdown from "./Dropdown";
 import { InputTypeIcon } from "./InputTypeIcon";
 
@@ -16,7 +16,7 @@ interface Keybind {
 interface ConfigBind {
   keycode: string;
   result_type: string;
-  result_value: number;
+  result_value: string;
 }
 
 function KeybindSettings({
@@ -30,13 +30,9 @@ function KeybindSettings({
 }) {
   const handleSave = () => {
     const configToSave = binds.map((bind) => ({
-      keycode: WINDOWS_ECMA_KEYMAP[bind.input].toString(16),
-      ...(bind.type === "controller"
-        ? CONTROLLER_INPUTS[bind.output]
-        : {
-            result_type: bind.type,
-            result_value: WINDOWS_ECMA_KEYMAP[bind.output],
-          }),
+      keycode: WEB_TO_RDEV_KEYMAP[bind.input],
+      result_type: bind.type,
+      result_value: WEB_TO_RDEV_KEYMAP[bind.output],
     }));
 
     invoke("save_config", { configs: configToSave })
@@ -51,25 +47,16 @@ function KeybindSettings({
         const configBinds = response as ConfigBind[];
         setBindsCount(configBinds.length);
         const newBinds = configBinds.map((configBind, i) => {
-          const keyIn = parseInt(configBind.keycode, 16);
+          const keyIn = configBind.keycode;
           const input =
-            Object.entries(WINDOWS_ECMA_KEYMAP).find(
+            Object.entries(WEB_TO_RDEV_KEYMAP).find(
               ([_, value]) => value === keyIn,
             )?.[0] ?? "";
-          let type: BindType = "controller";
+          let type: BindType = configBind.result_type as BindType;
           let output: string =
-            Object.entries(CONTROLLER_INPUTS).find(
-              ([_, value]) =>
-                value.result_type === configBind.result_type &&
-                value.result_value === configBind.result_value,
+            Object.entries(WEB_TO_RDEV_KEYMAP).find(
+              ([_, value]) => value === configBind.result_value,
             )?.[0] ?? "";
-          if (!output) {
-            type = configBind.result_type as BindType;
-            output =
-              Object.entries(WINDOWS_ECMA_KEYMAP).find(
-                ([_, value]) => value === configBind.result_value,
-              )?.[0] ?? "";
-          }
           return {
             id: i,
             type,
@@ -147,12 +134,12 @@ function KeybindSettings({
       console.log("Keydown event", event);
       let name = event.code;
       console.log(`Detected key ${name}`);
-      let winKeyCode = WINDOWS_ECMA_KEYMAP[name];
-      if (!winKeyCode) {
+      let rdevKeyCode = WEB_TO_RDEV_KEYMAP[name];
+      if (!rdevKeyCode) {
         name = event.key;
-        winKeyCode = WINDOWS_ECMA_KEYMAP[name];
+        rdevKeyCode = WEB_TO_RDEV_KEYMAP[name];
       }
-      if (winKeyCode) {
+      if (rdevKeyCode) {
         if (activeKeybindId !== undefined) {
           const bind = binds.find((b) => b.id === activeKeybindId![0])!;
           // Record the key along with active mod keys
@@ -187,9 +174,9 @@ function KeybindSettings({
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      let winKeyCode = WINDOWS_ECMA_KEYMAP[event.code];
-      if (!winKeyCode) {
-        winKeyCode = WINDOWS_ECMA_KEYMAP[event.key];
+      let rdevKeyCode = WEB_TO_RDEV_KEYMAP[event.code];
+      if (!rdevKeyCode) {
+        rdevKeyCode = WEB_TO_RDEV_KEYMAP[event.key];
       }
     };
 
@@ -259,27 +246,9 @@ function KeybindSettings({
                 </div>
               </td>
               <td className="px-4 py-2">
-                {bind.type === "controller" ? (
+                {(
                   <Dropdown
-                    options={Object.keys(CONTROLLER_INPUTS)}
-                    onChange={(option) => {
-                      const newKeybinds = binds.map((b) =>
-                        b.id === bind.id
-                          ? {
-                              ...b,
-                              output: option,
-                              type: bind.type,
-                            }
-                          : b,
-                      );
-                      setBinds(newKeybinds);
-                    }}
-                  >
-                    {bind.output}
-                  </Dropdown>
-                ) : (
-                  <Dropdown
-                    options={Object.keys(WINDOWS_ECMA_KEYMAP)}
+                    options={Object.keys(WEB_TO_RDEV_KEYMAP)}
                     onOpen={() => {
                       setActiveKeybindId([bind.id, false]);
                     }}
@@ -322,7 +291,7 @@ function KeybindSettings({
               </td>
               <td className="px-4 py-2">
                 <Dropdown
-                  options={Object.keys(WINDOWS_ECMA_KEYMAP)}
+                  options={Object.keys(WEB_TO_RDEV_KEYMAP)}
                   onOpen={() => {
                     setActiveKeybindId([bind.id, true]);
                   }}
