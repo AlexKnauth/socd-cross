@@ -218,8 +218,10 @@ fn listen_callback(event: Event) {
         if opposite_key_states.contains_key(&key) {
             {
                 let key_state = opposite_key_states.get_mut(&key).unwrap();
-                if key_state.is_virtual_fresh && key_is_down == key_state.is_virtual_pressed {
-                    key_state.is_virtual_fresh = false;
+                if key_state.is_virtual_fresh {
+                    if key_is_down == key_state.is_virtual_pressed {
+                        key_state.is_virtual_fresh = false;
+                    }
                     return;
                 }
                 // if key_is_down != key_state.is_virtual_pressed {
