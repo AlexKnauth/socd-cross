@@ -25,6 +25,7 @@ jobs:
             dist_path: src-tauri/target/dist
             os: windows-latest
             target: x86_64-pc-windows-msvc
+            binaryen: x86_64-windows
             cargo_bin: C:/Users/runneradmin/.cargo/bin
 
           - label: socd-cross on Linux
@@ -32,6 +33,7 @@ jobs:
             dist_path: src-tauri/target/dist
             os: ubuntu-latest
             target: x86_64-unknown-linux-musl
+            binaryen: x86_64-linux
             cargo_bin: /home/runner/.cargo/bin
 
           - label: socd-cross on macOS ARM
@@ -39,6 +41,7 @@ jobs:
             dist_path: src-tauri/target/dist
             os: macos-latest
             target: aarch64-apple-darwin
+            binaryen: arm64-macos
             cargo_bin: /Users/runner/.cargo/bin
 
 
@@ -96,6 +99,7 @@ jobs:
         run: .github/workflows/build_zip.sh
         env:
           OS_NAME: ${{ matrix.os }}
+          TARGET: ${{ matrix.binaryen }}
 
       - name: Release (Tauri)
         if: matrix.platform == 'tauri' && github.repository == 'AlexKnauth/socd-cross' && github.ref == 'refs/heads/cross'
