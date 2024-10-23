@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "cross"
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        label:
+          - socd-cross on Windows
+          - socd-cross on Linux
+          - socd-cross on macOS ARM
+
+        include:
+          - label: socd-cross on Windows
+            platform: tauri
+            dist_path: src-tauri/target/dist
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            cargo_bin: C:/Users/runneradmin/.cargo/bin
+
+          - label: socd-cross on Linux
+            platform: tauri
+            dist_path: src-tauri/target/dist
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            cargo_bin: /home/runner/.cargo/bin
+
+          - label: socd-cross on macOS ARM
+            platform: tauri
+            dist_path: src-tauri/target/dist
+            os: macos-latest
+            target: aarch64-apple-darwin
+            cargo_bin: /Users/runner/.cargo/bin
+
+
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          # This forces the entire history to be cloned, which is necessary for
+          # the changelog generation to work correctly.
+          fetch-depth: 0
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Install Rust
+        uses: hecrj/setup-rust-action@v2
+        with:
+          rust-version: nightly
+          components: rust-src
+          targets: wasm32-unknown-unknown
+
+      - name: Install npm packages
+        run: npm ci -f
+        env:
+          DETECT_CHROMEDRIVER_VERSION: true
+
+      - name: Install native dependencies (Tauri)
+        if: matrix.platform == 'tauri' && matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.0-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Generate Icons (Tauri)
+        if: matrix.platform == 'tauri'
+        run: npm run tauri icon
+
+      - name: Build (Tauri)
+        if: matrix.platform == 'tauri'
+        run: npm run tauri build
+
+      - name: Prepare Release (Tauri)
+        if: matrix.platform == 'tauri' && github.repository == 'AlexKnauth/socd-cross' && github.ref == 'refs/heads/cross'
+        shell: bash
+        run: .github/workflows/build_zip.sh
+        env:
+          OS_NAME: ${{ matrix.os }}
+
+      - name: Release (Tauri)
+        if: matrix.platform == 'tauri' && github.repository == 'AlexKnauth/socd-cross' && github.ref == 'refs/heads/cross'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: socd-cross-*.*
+          name: Latest
+          tag_name: latest
+          body: The latest version of socd-cross.
