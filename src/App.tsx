@@ -13,34 +13,34 @@ type LogEntry = {
 };
 
 function App() {
-  const runOverbind = async () => {
+  const runSocdCross = async () => {
     try {
       const response = await invoke("start_interception");
       console.log(response); // Log or handle the success response
       setErr("");
-      await updateIsOverbindRunning();
+      await updateIsSocdCrossRunning();
     } catch (error) {
       console.error(error); // Handle the error case
       setErr(error as string);
     }
   };
 
-  const stopOverbind = async () => {
+  const stopSocdCross = async () => {
     try {
       const response = await invoke("stop_interception");
       console.log(response);
       setErr("");
-      await updateIsOverbindRunning();
+      await updateIsSocdCrossRunning();
     } catch (error) {
       console.error(error);
       setErr(error as string);
     }
   };
 
-  const updateIsOverbindRunning = async () => {
+  const updateIsSocdCrossRunning = async () => {
     try {
       const response = await invoke("is_interceptor_running");
-      setIsOverbindRunning(response as boolean);
+      setIsSocdCrossRunning(response as boolean);
     } catch (error) {
       console.error(error);
     }
@@ -57,7 +57,7 @@ function App() {
       );
   };
 
-  const [isOverbindRunning, setIsOverbindRunning] = useState(false);
+  const [isSocdCrossRunning, setIsSocdCrossRunning] = useState(false);
   const [isEditingBinds, setIsEditingBinds] = useState(false);
   const [isEditingSettings, setEditingSettings] = useState(false);
   const [err, setErr] = useState("");
@@ -107,27 +107,27 @@ function App() {
   // update ui when tray menu is used
   useEffect(() => {
     listen("tray_intercept_disable", () => {
-      setIsOverbindRunning(false);
+      setIsSocdCrossRunning(false);
     });
     listen("tray_intercept_enable", () => {
-      setIsOverbindRunning(true);
+      setIsSocdCrossRunning(true);
     });
   }, []);
 
   useEffect(() => {
     if (!init) {
       init = true;
-      runOverbind();
+      runSocdCross();
     }
   }, []);
 
   return (
     <div className="justify-centerpt-[10vh] m-0 flex flex-col text-center">
       <div className="overcharm-bg flex h-[90px] items-center justify-center">
-        <h1 className="text-center text-3xl">Welcome to OverBind!</h1>
+        <h1 className="text-center text-3xl">Welcome to socd-cross!</h1>
       </div>
 
-      {isOverbindRunning ? (
+      {isSocdCrossRunning ? (
         <div className="flex items-center justify-center gap-2 text-2xl">
           <div className="h-4 w-4 rounded-full bg-green-500 shadow-[0_0_8px_2px_rgba(0,255,0,0.6)]" />
           Enabled
@@ -141,17 +141,17 @@ function App() {
 
       {isDirty && (
         <div className="text-red-500">
-          <p>Please restart Overbind for your changes to take effect.</p>
+          <p>Please restart socd-cross for your changes to take effect.</p>
         </div>
       )}
 
       <div className="mt-4 flex w-full justify-center gap-2.5">
-        {!isOverbindRunning ? (
+        {!isSocdCrossRunning ? (
           <button
             className="rounded-md bg-purple-500 bg-opacity-60 px-5 py-2.5 text-base font-medium
             text-white shadow outline-none transition-colors
             hover:bg-purple-600 active:bg-purple-800 active:bg-opacity-40"
-            onClick={runOverbind}
+            onClick={runSocdCross}
           >
             Launch
           </button>
@@ -160,7 +160,7 @@ function App() {
             className="rounded-md bg-red-500 bg-opacity-60 px-5 py-2.5 text-base font-medium
             text-white shadow outline-none transition-colors
             hover:bg-red-600 active:bg-red-800 active:bg-opacity-40"
-            onClick={stopOverbind}
+            onClick={stopSocdCross}
           >
             Stop
           </button>
@@ -213,9 +213,9 @@ function App() {
           onCancel={() => setIsEditingBinds(false)}
           onSave={async () => {
             setIsEditingBinds(false);
-            if (isOverbindRunning) {
-              await stopOverbind();
-              await runOverbind();
+            if (isSocdCrossRunning) {
+              await stopSocdCross();
+              await runSocdCross();
             }
           }}
           onErr={setErr}
@@ -227,9 +227,9 @@ function App() {
           onCancel={() => setEditingSettings(false)}
           onSave={async () => {
             setEditingSettings(false);
-            if (isOverbindRunning) {
-              await stopOverbind();
-              await runOverbind();
+            if (isSocdCrossRunning) {
+              await stopSocdCross();
+              await runSocdCross();
             }
           }}
           onDirtySave={() => setIsDirty(true)}

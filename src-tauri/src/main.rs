@@ -54,26 +54,26 @@ fn is_key_interception_running(state: &State<KeyInterceptorState>) -> bool {
 }
 
 fn make_disable_tray_menu() -> tauri::SystemTrayMenu {
-    let disble_interception = tauri::CustomMenuItem::new("disable".to_string(), "Disable OverBind");
-    let open_overbind_settings =
-        tauri::CustomMenuItem::new("settings".to_string(), "Open OverBind Settings");
+    let disble_interception = tauri::CustomMenuItem::new("disable".to_string(), "Disable socd-cross");
+    let open_socd_cross_settings =
+        tauri::CustomMenuItem::new("settings".to_string(), "Open socd-cross Settings");
     let exit = tauri::CustomMenuItem::new("exit".to_string(), "Exit");
 
     tauri::SystemTrayMenu::new()
         .add_item(disble_interception)
-        .add_item(open_overbind_settings)
+        .add_item(open_socd_cross_settings)
         .add_item(exit)
 }
 
 fn make_enable_tray_menu() -> tauri::SystemTrayMenu {
-    let enable_interception = tauri::CustomMenuItem::new("enable".to_string(), "Enable OverBind");
-    let open_overbind_settings =
-        tauri::CustomMenuItem::new("settings".to_string(), "Open OverBind Settings");
+    let enable_interception = tauri::CustomMenuItem::new("enable".to_string(), "Enable socd-cross");
+    let open_socd_cross_settings =
+        tauri::CustomMenuItem::new("settings".to_string(), "Open socd-cross Settings");
     let exit = tauri::CustomMenuItem::new("exit".to_string(), "Exit");
 
     tauri::SystemTrayMenu::new()
         .add_item(enable_interception)
-        .add_item(open_overbind_settings)
+        .add_item(open_socd_cross_settings)
         .add_item(exit)
 }
 
@@ -100,9 +100,9 @@ fn is_interceptor_running(state: State<KeyInterceptorState>) -> bool {
 fn get_config_path() -> Result<PathBuf, String> {
     match data_dir() {
         Some(mut path) => {
-            path.push("OverBind"); // Use your app's unique folder name
+            path.push("socd-cross"); // Use your app's unique folder name
             std::fs::create_dir_all(&path).map_err(|e| e.to_string())?; // Create the dir if it doesn't exist
-            path.push("OverBind_conf.json");
+            path.push("socd-cross-conf.json");
             Ok(path)
         }
         None => Err("Failed to get user data directory".into()),
@@ -137,7 +137,7 @@ fn ensure_config_file_exists() -> Result<(), String> {
     let config_path = get_config_path()?;
     if !config_path.exists() {
         // Assuming 'include_str!' is used to include the file contents in the binary
-        let default_contents = include_str!("../OverBind_conf.json");
+        let default_contents = include_str!("../socd-cross-conf.json");
         fs::write(config_path, default_contents).map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -147,7 +147,7 @@ fn ensure_settings_file_exists() -> Result<(), String> {
     let config_path = get_app_settings_path()?;
     if !config_path.exists() {
         // Assuming 'include_str!' is used to include the file contents in the binary
-        let default_contents = include_str!("../OverBind_app_settings.json");
+        let default_contents = include_str!("../socd-cross-app-settings.json");
         fs::write(config_path, default_contents).map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -156,9 +156,9 @@ fn ensure_settings_file_exists() -> Result<(), String> {
 fn get_app_settings_path() -> Result<PathBuf, String> {
     match data_dir() {
         Some(mut path) => {
-            path.push("OverBind"); // Use your app's unique folder name
+            path.push("socd-cross"); // Use your app's unique folder name
             std::fs::create_dir_all(&path).map_err(|e| e.to_string())?; // Create the dir if it doesn't exist
-            path.push("OverBind_app_settings.json");
+            path.push("socd-cross-app-settings.json");
             Ok(path)
         }
         None => Err("Failed to get user data directory".into()),
