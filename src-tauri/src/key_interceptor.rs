@@ -222,9 +222,9 @@ fn listen_callback(event: Event) {
                     key_state.is_virtual_fresh = false;
                     return;
                 }
-                if key_is_down != key_state.is_virtual_pressed {
-                    println!("{:?} {}", key, key_is_down);
-                }
+                // if key_is_down != key_state.is_virtual_pressed {
+                //     println!("{:?} {}", key, key_is_down);
+                // }
                 key_state.is_pressed = key_is_down;
                 key_state.is_virtual_pressed = key_is_down;
 
@@ -243,7 +243,7 @@ fn listen_callback(event: Event) {
                 {
                     let opposite_key_value = cloned_key_state.opposite_key_value;
                     drop(opposite_key_states);
-                    println!(" -> {:?} false", opposite_key_value);
+                    // println!(" -> {:?} false", opposite_key_value);
                     simulate(&EventType::KeyRelease(opposite_key_value)).ok();
                     return;
                 }
@@ -254,7 +254,7 @@ fn listen_callback(event: Event) {
                 {
                     let opposite_key_value = cloned_key_state.opposite_key_value;
                     drop(opposite_key_states);
-                    println!(" -> {:?} true", opposite_key_value);
+                    // println!(" -> {:?} true", opposite_key_value);
                     simulate(&EventType::KeyPress(opposite_key_value)).ok();
                     return;
                 }
