@@ -64,6 +64,8 @@ impl KeyInterceptor {
 
     pub fn initialize(&mut self, settings: &Settings) -> Result<(), String> {
         std::thread::spawn(|| {
+            #[cfg(target_os = "macos")]
+            rdev::set_is_main_thread(false);
             // This will block.
             if let Err(error) = listen(listen_callback) {
                 println!("Error: {:?}", error)
