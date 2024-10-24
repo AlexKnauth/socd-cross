@@ -4,7 +4,7 @@ import { WEB_TO_RDEV_KEYMAP } from "../constants";
 import Dropdown from "./Dropdown";
 import { InputTypeIcon } from "./InputTypeIcon";
 
-type BindType = "controller" | "keyboard" | "socd" | undefined;
+type BindType = "keyboard" | "socd" | undefined;
 
 interface Keybind {
   id: number;
@@ -372,7 +372,7 @@ function KeybindSettings({
             >
               +
               <Dropdown
-                options={["Keyboard", "Controller", "SOCD"]}
+                options={["Keyboard", "SOCD"]}
                 onChange={(option) => {
                   const type = option.toLowerCase() as BindType;
                   if (type === "socd") {

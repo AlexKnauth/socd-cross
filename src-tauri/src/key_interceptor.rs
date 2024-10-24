@@ -122,8 +122,7 @@ impl KeyInterceptor {
                 let mut key_mapping = None;
 
                 if key_state.is_some()
-                    && (key_state.unwrap().result_type == "keyboard"
-                        || key_state.unwrap().result_type == "face_button")
+                    && key_state.unwrap().result_type == "keyboard"
                 {
                     key_type = key_state.unwrap().result_type.clone();
                     key_mapping = Some(key_state.unwrap().result_value.clone());
