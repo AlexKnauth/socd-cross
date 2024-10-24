@@ -93,6 +93,10 @@ jobs:
         if: matrix.platform == 'tauri'
         run: npm run tauri build
 
+      - name: Bundle MacOS App (Tauri)
+        if: matrix.platform == 'tauri' && matrix.os == 'macos-latest'
+        run: npm run tauri build -- --bundles app
+
       - name: Prepare Release (Tauri)
         if: matrix.platform == 'tauri' && github.repository == 'AlexKnauth/socd-cross' && github.ref == 'refs/heads/cross'
         shell: bash
