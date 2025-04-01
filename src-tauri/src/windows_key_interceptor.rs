@@ -49,7 +49,7 @@ struct KeyState {
     result_value: i32,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct OppositeKey {
     is_pressed: bool,
     is_virtual_pressed: bool,
@@ -127,18 +127,25 @@ impl KeyInterceptorTrait for WindowsKeyInterceptor {
 
         let data: Vec<ConfigJsonData> =
             serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+        // debug!("data = {:?}", data);
         let mut key_states = HashMap::new();
         let mut opposite_key_states = HashMap::new();
 
         for item in &data {
-            let keycode =
+            let windows_keycode =
                 u32::from_str_radix(&item.keycode, 16).expect("Invalid hexadecimal string");
+            let keycode = windows_code_to_scan_code(windows_keycode).unwrap();
 
             if item.result_type != "socd" {
+                let mut result_value = item.result_value;
+                if item.result_type == "keyboard" {
+                    result_value = windows_code_to_scan_code(result_value as u32).unwrap() as i32;
+                }
+
                 let key_state = key_states.entry(keycode).or_insert_with(|| KeyState {
                     is_pressed: false,
                     result_type: item.result_type.clone(),
-                    result_value: item.result_value,
+                    result_value,
                 });
                 debug!(
                     "Keycode: {:?}, ResultType: {:?}, ResultValue {:?}",
@@ -148,13 +155,17 @@ impl KeyInterceptorTrait for WindowsKeyInterceptor {
         }
 
         for item in &data {
-            let keycode = u32::from_str_radix(&item.keycode, 16);
+            let windows_keycode =
+                u32::from_str_radix(&item.keycode, 16).expect("Invalid hexadecimal string");
+            let keycode = windows_code_to_scan_code(windows_keycode).unwrap();
 
             if item.result_type == "socd" {
-                let opposite_keycode = item.result_value as u32;
+                let windows_opposite_keycode = item.result_value as u32;
+                let opposite_keycode =
+                    windows_code_to_scan_code(windows_opposite_keycode).unwrap();
 
                 // Check if key_state has a value for the opposite keycode and if so then use that value instead
-                let key_state = key_states.get(&keycode.clone().unwrap());
+                let key_state = key_states.get(&keycode.clone());
                 let mut key_type = String::from("keyboard");
                 let mut key_mapping = None;
 
@@ -167,7 +178,7 @@ impl KeyInterceptorTrait for WindowsKeyInterceptor {
                 }
 
                 let opposite_key_state = opposite_key_states
-                    .entry(keycode.clone().unwrap())
+                    .entry(keycode.clone())
                     .or_insert_with(|| OppositeKey {
                         is_pressed: false,
                         is_virtual_pressed: false,
@@ -184,6 +195,8 @@ impl KeyInterceptorTrait for WindowsKeyInterceptor {
                 );
             }
         }
+
+        // debug!("opposite_key_states = {:?}", opposite_key_states);
 
         *KEY_STATES.write().unwrap() = key_states;
         *OPPOSITE_KEY_STATES.write().unwrap() = opposite_key_states;
@@ -353,20 +366,20 @@ impl KeyInterceptorTrait for WindowsKeyInterceptor {
 
 fn is_extended_key(virtual_keycode: u32) -> bool {
     let extended_keys: [u32; 14] = [
-        0x21, //page up
-        0x22, //page down
-        0x23, //end
-        0x24, //home
-        0x25, //left arrow
-        0x26, //up arrow
-        0x27, //right arrow
-        0x28, //down arrow
-        0x2C, //print screen
-        0x2D, //insert
-        0x2E, //delete
-        0x90, //numlock
-        0xA3, //right CTRL
-        0xA5, //right ALT
+        0x49, //page up
+        0x51, //page down
+        0x4F, //end
+        0x47, //home
+        0x4B, //left arrow
+        0x48, //up arrow
+        0x4D, //right arrow
+        0x50, //down arrow
+        0x154, //print screen
+        0x52, //insert
+        0x53, //delete
+        0x145, //numlock
+        0x11D, //right CTRL
+        0x138, //right ALT
     ];
     extended_keys.contains(&virtual_keycode)
 }
@@ -410,12 +423,14 @@ unsafe extern "system" fn low_level_keyboard_proc_callback(
     {
         return CallNextHookEx(HHOOK::default(), n_code, w_param, l_param);
     }
-    let key = (*kbd_struct).vkCode;
+    let key = (*kbd_struct).scanCode;
     let key_is_down = match w_param.0 as u32 {
         WM_KEYDOWN | WM_SYSKEYDOWN => true,
         WM_KEYUP | WM_SYSKEYUP => false,
         _ => return CallNextHookEx(None, n_code, w_param, l_param),
     };
+
+    // debug!("in:  key = {}, key_is_down = {}", key, key_is_down);
 
     let mut disable_keyboard = false;
     {
@@ -447,11 +462,11 @@ unsafe extern "system" fn low_level_keyboard_proc_callback(
         if let Some(flag) = key_event_flag {
             if let Some(key_state) = key_states.get(&key) {
                 if key_state.result_type == "keyboard" {
-                    let vk_code = key_state.result_value as u16;
+                    let scan_code = key_state.result_value as u16;
 
                     let ki = KEYBDINPUT {
-                        wVk: VIRTUAL_KEY(vk_code),
-                        wScan: 0,
+                        wVk: VIRTUAL_KEY(0),
+                        wScan: scan_code,
                         dwFlags: flag,
                         time: 0,
                         dwExtraInfo: 0,
@@ -517,7 +532,9 @@ unsafe extern "system" fn low_level_keyboard_proc_callback(
                             KEYBD_EVENT_FLAGS(0)
                         };
 
-                        let code = MapVirtualKeyW(key_value, MAPVK_VK_TO_VSC_EX);
+                        let code = key_value;
+
+                        // debug!("out: key_value = {}, scan_code = {}, key_is_down = {}", key_value, code, false);
 
                         code as u16
                     };
@@ -563,7 +580,9 @@ unsafe extern "system" fn low_level_keyboard_proc_callback(
                             KEYBD_EVENT_FLAGS(0)
                         };
 
-                        let code = MapVirtualKeyW(key_value, MAPVK_VK_TO_VSC_EX);
+                        let code = key_value;
+
+                        // debug!("out: key_value = {}, scan_code = {}, key_is_down = {}", key_value, code, true);
 
                         code as u16
                     };
@@ -672,4 +691,129 @@ unsafe extern "system" fn low_level_keyboard_proc_callback(
     }
 
     return CallNextHookEx(None, n_code, w_param, l_param);
+}
+
+fn windows_code_to_scan_code(code: u32) -> Option<u32> {
+    match code {
+        0x08 => Some(0x0E), // Backspace
+        0x09 => Some(0x0F), // Tab
+        0x0D => Some(0x1C), // Enter
+        0x10 => Some(0x2A), // Shift
+        0x11 => Some(0x1D), // Control
+        0x12 => Some(0x38), // Alt
+        0x13 => Some(0x45), // Pause
+        0x14 => Some(0x3A), // CapsLock
+        0x1B => Some(0x01), // Escape
+        0x20 => Some(0x39), // Space
+        0x21 => Some(0x49), // PageUp TODO: PageUp vs Numpad9
+        0x22 => Some(0x51), // PageDown TODO: PageDown vs Numpad3
+        0x23 => Some(0x4F), // End TODO: End vs Numpad1
+        0x24 => Some(0x47), // Home TODO: Home vs Numpad7
+        0x25 => Some(0x4B), // ArrowLeft TODO: ArrowLeft vs Numpad4
+        0x26 => Some(0x48), // ArrowUp TODO: ArrowUp vs Numpad8
+        0x27 => Some(0x4D), // ArrowRight TODO: ArrowRight vs Numpad6
+        0x28 => Some(0x50), // ArrowDown TODO: ArrowDown vs Numpad2
+        0x2C => Some(0x154), // PrintScreen
+        0x2D => Some(0x52), // Insert TODO: Insert vs Numpad0
+        0x2E => Some(0x53), // Delete TODO: Delete vs NumpadDecimal
+        0x30 => Some(0x02), // Digit0
+        0x31 => Some(0x03), // Digit1
+        0x32 => Some(0x04), // Digit2
+        0x33 => Some(0x05), // Digit3
+        0x34 => Some(0x06), // Digit4
+        0x35 => Some(0x08), // Digit5
+        0x36 => Some(0x08), // Digit6
+        0x37 => Some(0x09), // Digit7
+        0x38 => Some(0x0A), // Digit8
+        0x39 => Some(0x0B), // Digit9
+        0x41 => Some(0x1E), // KeyA
+        0x42 => Some(0x30), // KeyB
+        0x43 => Some(0x2E), // KeyC
+        0x44 => Some(0x20), // KeyD
+        0x45 => Some(0x12), // KeyE
+        0x46 => Some(0x21), // KeyF
+        0x47 => Some(0x22), // KeyG
+        0x48 => Some(0x23), // KeyH
+        0x49 => Some(0x17), // KeyI
+        0x4A => Some(0x24), // KeyJ
+        0x4B => Some(0x25), // KeyK
+        0x4C => Some(0x26), // KeyL
+        0x4D => Some(0x32), // KeyM
+        0x4E => Some(0x31), // KeyN
+        0x4F => Some(0x18), // KeyO
+        0x50 => Some(0x19), // KeyP
+        0x51 => Some(0x10), // KeyQ
+        0x52 => Some(0x13), // KeyR
+        0x53 => Some(0x1F), // KeyS
+        0x54 => Some(0x14), // KeyT
+        0x55 => Some(0x16), // KeyU
+        0x56 => Some(0x2F), // KeyV
+        0x57 => Some(0x11), // KeyW
+        0x58 => Some(0x2D), // KeyX
+        0x59 => Some(0x15), // KeyY
+        0x5A => Some(0x2C), // KeyZ
+        0x5B => Some(0x15B), // MetaLeft, Left Windows Key
+        0x5C => Some(0x15C), // MetaRight, Right Windows Key
+        0x5D => Some(0x15D), // ContextMenu, Apps Key
+        0x60 => Some(0x52), // Numpad0
+        0x61 => Some(0x4F), // Numpad1
+        0x62 => Some(0x50), // Numpad2
+        0x63 => Some(0x51), // Numpad3
+        0x64 => Some(0x4B), // Numpad4
+        0x65 => Some(0x4C), // Numpad5
+        0x66 => Some(0x4D), // Numpad6
+        0x67 => Some(0x47), // Numpad7
+        0x68 => Some(0x48), // Numpad8
+        0x69 => Some(0x49), // Numpad9
+        0x6A => Some(0x37), // NumpadMultiply
+        0x6B => Some(0x4E), // NumpadAdd
+        0x6D => Some(0x4A), // NumpadSubtract
+        0x6E => Some(0x53), // NumpadDecimal
+        0x6F => Some(0x135), // NumpadDivide
+        0x70 => Some(0x3B), // F1
+        0x71 => Some(0x3C), // F2
+        0x72 => Some(0x3D), // F3
+        0x73 => Some(0x3E), // F4
+        0x74 => Some(0x3F), // F5
+        0x75 => Some(0x40), // F6
+        0x76 => Some(0x41), // F7
+        0x77 => Some(0x42), // F8
+        0x78 => Some(0x43), // F9
+        0x79 => Some(0x44), // F10
+        0x7A => Some(0x57), // F11
+        0x7B => Some(0x58), // F12
+        0x7C => Some(0x64), // F13
+        0x7D => Some(0x65), // F14
+        0x7E => Some(0x66), // F15
+        0x7F => Some(0x67), // F16
+        0x80 => Some(0x68), // F17
+        0x81 => Some(0x67), // F18
+        0x82 => Some(0x6A), // F19
+        0x83 => Some(0x6B), // F20
+        0x84 => Some(0x6C), // F21
+        0x85 => Some(0x6D), // F22
+        0x86 => Some(0x6E), // F23
+        0x87 => Some(0x76), // F24
+        0x90 => Some(0x145), // Numlock
+        0x91 => Some(0x46), // ScrollLock
+        0xA0 => Some(0x2A), // ShiftLeft
+        0xA1 => Some(0x136), // ShiftRight
+        0xA2 => Some(0x1D), // ControlLeft
+        0xA3 => Some(0x11D), // ControlRight
+        0xA4 => Some(0x38), // AltLeft
+        0xA5 => Some(0x138), // AltRight
+        0xBA => Some(0x27), // Semicolon
+        0xBB => Some(0x0D), // Equal
+        0xBC => Some(0x33), // Comma
+        0xBD => Some(0x0C), // Minus
+        0xBE => Some(0x34), // Period
+        0xBF => Some(0x35), // Slash
+        0xC0 => Some(0x29), // Backquote
+        0xDB => Some(0x1A), // BracketLeft
+        0xDC => Some(0x2B), // Backslash
+        0xDD => Some(0x1B), // BracketRight
+        0xDE => Some(0x28), // Quote
+        0xE2 => Some(0x56), // IntlBackslash
+        _ => None,
+    }
 }
